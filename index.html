@@ -315,29 +315,7 @@
         <div id="cam-reader" style="display:none;width:100%"></div>
       </div>
       <div class="cam-msg" id="cam-msg"></div>
-      function startCamera(){
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.capture = 'environment';
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if(!file) return;
-    document.getElementById('cam-msg').textContent = '⏳ Analyse...';
-    document.getElementById('cam-msg').className = 'cam-msg ok';
-    try {
-      const scanner = new Html5Qrcode("cam-reader");
-      const result = await scanner.scanFile(file, true);
-      closeScanModal();
-      lookupBarcode(result);
-    } catch(e) {
-      document.getElementById('cam-msg').textContent = '❌ Code non détecté. Réessaie.';
-      document.getElementById('cam-msg').className = 'cam-msg';
-      document.getElementById('cam-start-btn').style.display = 'block';
-    }
-  };
-  input.click();
-}
+      <button class="cta" id="cam-start-btn" onclick="startCamera()">🎥 Activer la caméra</button>
       <div class="errmsg" id="cam-error" style="display:none"></div>
     </div>
     <button class="cancelbtn" onclick="closeScanModal()">Fermer</button>
@@ -633,29 +611,29 @@ function showScanError(msg) {
 }
 
 function startCamera() {
-  document.getElementById('cam-start-btn').style.display='none';
-  document.getElementById('cam-placeholder').style.display='none';
-  document.getElementById('cam-error').style.display='none';
-  document.getElementById('cam-reader').style.display='block';
-  document.getElementById('cam-msg').textContent='📷 Pointez vers le code-barres';
-  document.getElementById('cam-msg').className='cam-msg ok';
-  try {
-    scannerInstance = new Html5Qrcode("cam-reader");
-    scannerInstance.start(
-      {facingMode:"environment"},
-      {fps:15,qrbox:{width:280,height:280},aspectRatio:1.333},
-      (code)=>{
-        stopCamera();
-        closeScanModal();
-        lookupBarcode(code);
-      },
-      ()=>{}
-    ).catch(err=>{
-      showCamError(err.toString().includes('NotAllowed')
-        ? '❌ Caméra non autorisée. Autorise-la dans les réglages Safari.'
-        : '❌ Caméra non disponible.');
-    });
-  } catch(e) { showCamError('❌ Erreur scanner.'); }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    document.getElementById('cam-msg').textContent = '⏳ Analyse...';
+    document.getElementById('cam-msg').className = 'cam-msg ok';
+    document.getElementById('cam-start-btn').style.display = 'none';
+    try {
+      const scanner = new Html5Qrcode("cam-reader");
+      const result = await scanner.scanFile(file, true);
+      closeScanModal();
+      lookupBarcode(result);
+    } catch(err) {
+      document.getElementById('cam-msg').textContent = '❌ Réessaie avec une photo plus nette.';
+      document.getElementById('cam-msg').className = 'cam-msg';
+      document.getElementById('cam-start-btn').textContent = '📷 Reprendre une photo';
+      document.getElementById('cam-start-btn').style.display = 'block';
+    }
+  };
+  input.click();
 }
 
 function stopCamera() {
