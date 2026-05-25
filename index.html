@@ -621,7 +621,7 @@ function startCamera() {
     scannerInstance = new Html5Qrcode("cam-reader");
     scannerInstance.start(
       {facingMode:"environment"},
-      {fps:10,qrbox:{width:250,height:130}},
+      {fps:15,qrbox:{width:280,height:280},aspectRatio:1.333},
       (code)=>{
         stopCamera();
         closeScanModal();
@@ -677,8 +677,8 @@ function updateQty(q) {
   });
   if(!currentProduct) return;
   const r = q/100;
-  fps:15,qrbox:{width:280,height:280},aspectRatio:1.333
-
+  document.getElementById('prod-kcal').textContent = Math.round(currentProduct.per100.cal*r);
+  document.getElementById('prod-p').textContent = (currentProduct.per100.p*r).toFixed(1)+'g';
   document.getElementById('prod-c').textContent = (currentProduct.per100.c*r).toFixed(1)+'g';
   document.getElementById('prod-f').textContent = (currentProduct.per100.f*r).toFixed(1)+'g';
 }
