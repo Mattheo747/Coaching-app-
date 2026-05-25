@@ -610,8 +610,29 @@ function showScanError(msg) {
   el.textContent = msg; el.style.display='block';
 }
 
-function startCamera() {
-  document.getElementById('cam-start-btn').style.display='none';
+function startCamera(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    document.getElementById('cam-msg').textContent = '⏳ Analyse en cours...';
+    document.getElementById('cam-msg').className = 'cam-msg ok';
+    try {
+      const html5QrCode = new Html5Qrcode("cam-reader");
+      const result = await html5QrCode.scanFile(file, true);
+      closeScanModal();
+      lookupBarcode(result);
+    } catch(e) {
+      document.getElementById('cam-msg').textContent = '❌ Code non détecté. Réessaie avec une meilleure photo.';
+      document.getElementById('cam-msg').className = 'cam-msg';
+      document.getElementById('cam-start-btn').style.display = 'block';
+    }
+  };
+  input.click();
+}  document.getElementById('cam-start-btn').style.display='none';
   document.getElementById('cam-placeholder').style.display='none';
   document.getElementById('cam-error').style.display='none';
   document.getElementById('cam-reader').style.display='block';
