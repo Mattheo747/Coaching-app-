@@ -611,6 +611,29 @@ function showScanError(msg) {
 }
 
 function startCamera(){
+  document.getElementById('cam-start-btn').style.display='none';
+  document.getElementById('cam-placeholder').style.display='none';
+  document.getElementById('cam-error').style.display='none';
+  document.getElementById('cam-reader').style.display='block';
+  document.getElementById('cam-msg').textContent='📷 Pointez vers le code-barres';
+  document.getElementById('cam-msg').className='cam-msg ok';
+  try{
+    scannerInstance=new Html5Qrcode("cam-reader");
+    scannerInstance.start(
+      {facingMode:"environment"},
+      {fps:15,qrbox:{width:280,height:280},aspectRatio:1.333},
+      (code)=>{stopCamera();closeScanModal();lookupBarcode(code);},
+      ()=>{}
+    ).catch(err=>{
+      document.getElementById('cam-reader').style.display='none';
+      const el=document.getElementById('cam-error');
+      el.textContent=err.toString().includes('NotAllowed')?'❌ Caméra non autorisée.':'❌ Caméra non disponible.';
+      el.style.display='block';
+      document.getElementById('cam-start-btn').textContent='🔄 Réessayer';
+      document.getElementById('cam-start-btn').style.display='block';
+    });
+  }catch(e){document.getElementById('cam-error').textContent='❌ Erreur.';document.getElementById('cam-error').style.display='block';document.getElementById('cam-start-btn').style.display='block';}
+}(){
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
