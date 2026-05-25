@@ -521,10 +521,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
         onkeydown="if(event.key==='Enter')searchOFF(this.value)"/>
       <button onclick="searchOFF(document.getElementById('food-search-input').value)">🔍</button>
     </div>
-    <div class="off-tag" id="off-tag">3,5 millions de produits · tape pour rechercher</div>
-    <div class="loading" id="off-loading" style="display:none">⏳ Recherche en cours...</div>
+    <div class="off-tag" id="off-tag">180 aliments bruts · tape pour rechercher</div>
+    <div class="loading" id="off-loading" style="display:none">⏳ Recherche Open Food Facts...</div>
     <div class="errmsg" id="off-error" style="display:none"></div>
-    <div id="off-results" style="max-height:400px;overflow-y:auto;margin-bottom:8px"></div>
+    <div id="local-results" style="max-height:340px;overflow-y:auto;margin-bottom:8px"></div>
+    <div id="off-results-title" style="display:none;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:8px;font-weight:600">🌍 Aussi sur Open Food Facts</div>
+    <div id="off-results" style="max-height:200px;overflow-y:auto;margin-bottom:8px"></div>
     <button class="btn-cancel" onclick="closeSearchModal()">Fermer</button>
   </div>
 </div>
@@ -1076,17 +1078,19 @@ function toggleMeal(idx){
 
 function removeFood(id){foodLog=foodLog.filter(i=>i.id!==id);renderMeals();}
 
-// ── SEARCH (Open Food Facts + local) ──────────────────────
+// ── SEARCH ────────────────────────────────────────────────
 let currentMealTarget = 0;
 
 function openSearchModal(mealIdx=0){
   currentMealTarget=mealIdx;
   document.getElementById('search-modal').style.display='flex';
   document.getElementById('food-search-input').value='';
+  document.getElementById('local-results').innerHTML='';
   document.getElementById('off-results').innerHTML='';
+  document.getElementById('off-results-title').style.display='none';
   document.getElementById('off-error').style.display='none';
   document.getElementById('off-loading').style.display='none';
-  document.getElementById('off-tag').textContent='3,5 millions de produits · tape pour rechercher';
+  document.getElementById('off-tag').textContent='180 aliments bruts · tape pour rechercher';
   renderLocalResults('');
   setTimeout(()=>document.getElementById('food-search-input').focus(),300);
 }
@@ -1097,18 +1101,36 @@ function closeSearchModal(){
 
 function onFoodSearch(q){
   clearTimeout(searchTimeout);
-  if(!q || q.length<2){renderLocalResults(q);return;}
+  // Reset OFF results on each new search
+  document.getElementById('off-results').innerHTML='';
+  document.getElementById('off-results-title').style.display='none';
+  document.getElementById('off-error').style.display='none';
+  document.getElementById('off-loading').style.display='none';
   renderLocalResults(q);
-  searchTimeout=setTimeout(()=>searchOFF(q),600);
+  // Only trigger OFF search if no local results
+  if(q.length>=2){
+    const norm=s=>s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    const localCount=FOOD_DB.filter(f=>norm(f.name).includes(norm(q))).length;
+    if(localCount===0){
+      searchTimeout=setTimeout(()=>searchOFF(q),800);
+    }
+  }
 }
 
 function renderLocalResults(q){
   const norm=s=>s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
   const nq=norm(q);
-  const results=q.length>1?FOOD_DB.filter(f=>norm(f.name).includes(nq)).slice(0,5):FOOD_DB.slice(0,8);
-  const label=q.length>1&&results.length>0?`✅ ${results.length} résultat(s) local${results.length>1?'x':''}`:'Aliments fréquents';
-  document.getElementById('off-tag').textContent=label;
-  document.getElementById('off-results').innerHTML=results.map(f=>`
+  const results=q.length>1
+    ?FOOD_DB.filter(f=>norm(f.name).includes(nq)).slice(0,10)
+    :FOOD_DB.slice(0,10);
+  if(q.length>1&&results.length>0){
+    document.getElementById('off-tag').textContent=`✅ ${results.length} aliment${results.length>1?'s':''} trouvé${results.length>1?'s':''}`;
+  } else if(q.length>1&&results.length===0){
+    document.getElementById('off-tag').textContent='Aucun résultat local — recherche sur Open Food Facts...';
+  } else {
+    document.getElementById('off-tag').textContent='180 aliments bruts · tape pour rechercher';
+  }
+  document.getElementById('local-results').innerHTML=results.map(f=>`
     <button class="food-result" onclick="selectLocalFood(${f.id})">
       <span class="food-result-emoji">${f.emoji}</span>
       <div style="flex:1;min-width:0">
@@ -1125,39 +1147,40 @@ async function searchOFF(q){
   document.getElementById('off-loading').style.display='block';
   document.getElementById('off-error').style.display='none';
   try{
-    const res=await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=8&lc=fr`);
+    const res=await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=6&lc=fr&fields=product_name,product_name_fr,brands,nutriments`);
     const data=await res.json();
     document.getElementById('off-loading').style.display='none';
     if(data.products&&data.products.length>0){
-      document.getElementById('off-tag').textContent=`🌍 ${data.products.length} résultat(s) Open Food Facts`;
-      const offHTML=data.products.map(p=>{
+      // Filter out products with no nutritional data
+      const valid=data.products.filter(p=>{
         const n=p.nutriments||{};
-        const cal=Math.round(n['energy-kcal_100g']||0);
-        const prot=+(n.proteins_100g||0).toFixed(1);
-        const carb=+(n.carbohydrates_100g||0).toFixed(1);
-        const fat=+(n.fat_100g||0).toFixed(1);
-        const name=p.product_name_fr||p.product_name||'Produit';
-        const brand=p.brands||'';
-        const emoji=getEmojiForName(name);
-        const prod=JSON.stringify({name,brand,emoji,cal,p:prot,c:carb,f:fat}).replace(/'/g,"\\'");
-        return`<button class="food-result" onclick='selectOFFFood(${prod})'>
-          <span class="food-result-emoji">${emoji}</span>
-          <div style="flex:1;min-width:0">
-            <div class="food-result-name">${name}</div>
-            <div class="food-result-macros">${brand?brand+' · ':''}P ${prot}g · G ${carb}g · L ${fat}g</div>
-          </div>
-          <span class="food-result-kcal">${cal} kcal</span>
-        </button>`;
-      }).join('');
-      document.getElementById('off-results').innerHTML=offHTML;
-    }else{
-      document.getElementById('off-error').textContent='Aucun résultat Open Food Facts. Essaie un autre terme.';
-      document.getElementById('off-error').style.display='block';
+        return (n['energy-kcal_100g']||0)>0;
+      }).slice(0,5);
+      if(valid.length>0){
+        document.getElementById('off-results-title').style.display='block';
+        document.getElementById('off-results').innerHTML=valid.map(p=>{
+          const n=p.nutriments||{};
+          const cal=Math.round(n['energy-kcal_100g']||0);
+          const prot=+(n.proteins_100g||0).toFixed(1);
+          const carb=+(n.carbohydrates_100g||0).toFixed(1);
+          const fat=+(n.fat_100g||0).toFixed(1);
+          const name=p.product_name_fr||p.product_name||'Produit';
+          const brand=p.brands||'';
+          const emoji=getEmojiForName(name);
+          const prod=JSON.stringify({name,brand,emoji,cal,p:prot,c:carb,f:fat}).replace(/'/g,"\\'");
+          return`<button class="food-result" onclick='selectOFFFood(${prod})'>
+            <span class="food-result-emoji">${emoji}</span>
+            <div style="flex:1;min-width:0">
+              <div class="food-result-name">${name}</div>
+              <div class="food-result-macros">${brand?brand+' · ':''}P ${prot}g · G ${carb}g · L ${fat}g</div>
+            </div>
+            <span class="food-result-kcal">${cal} kcal</span>
+          </button>`;
+        }).join('');
+      }
     }
   }catch(e){
     document.getElementById('off-loading').style.display='none';
-    document.getElementById('off-error').textContent='Open Food Facts non disponible. Résultats locaux affichés.';
-    document.getElementById('off-error').style.display='block';
   }
 }
 
